@@ -1,3 +1,5 @@
-export const ComponentName = () => {
+const ComponentName = () => {
   return 'Hello world!';
 };
+
+export default ComponentName;
