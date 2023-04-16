@@ -1,6 +1,9 @@
+import path from 'path';
 import process from 'process';
 
 import { Project, Node, ts, SourceFile, ImportDeclaration } from 'ts-morph';
+import { GraphOptions } from 'ts_dependency_graph';
+import * as lib from 'ts_dependency_graph/dist/lib';
 
 export const trimQuotes = (str: string) => {
   return str.slice(1, -1);
@@ -57,19 +60,40 @@ const replaceDefaultImportToNamedImport = (
   });
 };
 
+const getSourceFilesMap = (project: Project) => {
+  const sourceFiles = project.getSourceFiles('test-project/**/*.ts');
+
+  return sourceFiles.reduce((acc, sourceFile) => {
+    acc[path.relative(process.cwd(), sourceFile.getFilePath())] = sourceFile;
+    return acc;
+  }, {} as Record<string, SourceFile>);
+};
+
+const getDependencyGraph = () => {
+  const options: GraphOptions = {
+    start: 'test-project/A-usage.ts',
+    graph_folder: false,
+  };
+
+  return lib.get_graph(options);
+};
+
 export const migrateToNamedExport = () => {
   const project = new Project({
     tsConfigFilePath: 'tsconfig.json',
+    // skipAddingFilesFromTsConfig: true,
+    // skipFileDependencyResolution: true,
   });
 
-  const sourceFiles = project.getSourceFiles('test-project/**/*.ts');
-
+  const sourceFilesMap = getSourceFilesMap(project);
   const tsConfig = getTsConfig();
+  const dependencyGraph = getDependencyGraph();
 
   if (tsConfig) {
     const pathsWithExports: Record<string, string> = {};
 
-    for (const sourceFile of sourceFiles) {
+    for (const node of dependencyGraph.nodes.reverse()) {
+      const sourceFile = sourceFilesMap[node.path];
       const currentFilePath = sourceFile.getFilePath();
 
       const defaultExportName = getDefaultExportName(sourceFile);
