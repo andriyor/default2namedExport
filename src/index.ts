@@ -4,6 +4,7 @@ import process from 'process';
 import { Project, Node, ts, SourceFile, ImportDeclaration } from 'ts-morph';
 import { GraphOptions } from 'ts_dependency_graph';
 import * as lib from 'ts_dependency_graph/dist/lib';
+import * as util from 'util';
 
 export const trimQuotes = (str: string) => {
   return str.slice(1, -1);

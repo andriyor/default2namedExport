@@ -1,5 +1,8 @@
 import ComponentName from './B-method';
-import helper from './src/method';
+import Button from './src/components/Button';
+import Input from './src/components/Input';
 
 console.log(ComponentName());
-console.log(helper());
+console.log(Button());
+console.log(Input());
+
