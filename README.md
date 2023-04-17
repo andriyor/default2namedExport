@@ -5,5 +5,6 @@
 - [x] Basic example with alphabetical order
 - [x] import graph resolution
 - [x] imported with different name
-- [ ] export { default } from './module';
-- [ ] export { default as method } from './module';
+- [x] index file with `export { default } from './module';`
+- [ ] index file with multiple `export { default as method } from './module';`
+- [ ] paths in `tsconfig.json`
