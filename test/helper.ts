@@ -15,9 +15,9 @@ const getProjectFilesByPath = (projectPath: string) => {
 };
 
 export const prepareTestCases = () => {
-  const testProjectFiles = getProjectFilesByPath('test-project');
+  const testProjectFiles = getProjectFilesByPath('test/test-project');
   const testProjectFilesExpected = getProjectFilesByPath(
-    'test-project-expected'
+    'test/test-project-expected'
   );
   return zip([testProjectFiles, testProjectFilesExpected]);
 };

@@ -149,5 +149,5 @@ export const migrateToNamedExport = (config: Config) => {
 };
 
 // migrateToNamedExport({
-//   start: 'test-project/A-usage.ts',
+//   start: 'test/test-project/A-usage.ts',
 // });
