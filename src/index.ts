@@ -69,16 +69,20 @@ const getSourceFilesMap = (project: Project) => {
   }, {} as Record<string, SourceFile>);
 };
 
-const getDependencyGraph = () => {
+const getDependencyGraph = (config: Config) => {
   const options: GraphOptions = {
-    start: 'test-project/A-usage.ts',
+    start: config.start,
     graph_folder: false,
   };
 
   return lib.get_graph(options);
 };
 
-export const migrateToNamedExport = () => {
+type Config = {
+  start: string;
+};
+
+export const migrateToNamedExport = (config: Config) => {
   const project = new Project({
     tsConfigFilePath: 'tsconfig.json',
     // skipAddingFilesFromTsConfig: true,
@@ -87,7 +91,7 @@ export const migrateToNamedExport = () => {
 
   const sourceFilesMap = getSourceFilesMap(project);
   const tsConfig = getTsConfig();
-  const dependencyGraph = getDependencyGraph();
+  const dependencyGraph = getDependencyGraph(config);
 
   if (tsConfig) {
     const pathsWithExports: Record<string, string> = {};
@@ -144,4 +148,6 @@ export const migrateToNamedExport = () => {
   return project.save();
 };
 
-migrateToNamedExport();
+// migrateToNamedExport({
+//   start: 'test-project/A-usage.ts',
+// });
