@@ -1,4 +1,4 @@
-import { helper } from '../helper/helper';
+import { helper } from '../../helper/helper';
 
 export const Input = () => {
   helper();

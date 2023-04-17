@@ -1,6 +1,6 @@
 import ComponentNameRenamed from './B-method';
-import Button from './src/components/Button';
-import Input from './src/components/Input';
+import Button from './src/components/main';
+import Input from './src/components/main/Input';
 
 console.log(ComponentNameRenamed());
 console.log(Button());

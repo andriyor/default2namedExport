@@ -149,7 +149,7 @@ export const migrateToNamedExport = (config: Config) => {
   return project.save();
 };
 
-// migrateToNamedExport({
-//   projectFiles: 'test/test-project/**/*.ts',
-//   start: 'test/test-project/A-usage.ts',
-// });
+migrateToNamedExport({
+  projectFiles: 'test/test-project/**/*.ts',
+  start: 'test/test-project/A-usage.ts',
+});
