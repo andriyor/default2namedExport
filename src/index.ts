@@ -4,7 +4,6 @@ import process from 'process';
 import { Project, Node, ts, SourceFile, ImportDeclaration } from 'ts-morph';
 import { GraphOptions } from 'ts_dependency_graph';
 import * as lib from 'ts_dependency_graph/dist/lib';
-import * as util from 'util';
 
 export const trimQuotes = (str: string) => {
   return str.slice(1, -1);
@@ -105,9 +104,11 @@ export const migrateToNamedExport = () => {
         });
       }
 
+      const renamedImport: Record<string, string> = {};
       sourceFile.forEachDescendant((node) => {
         if (Node.isImportDeclaration(node)) {
           const importText = trimQuotes(node.getModuleSpecifier().getText());
+          const importedAsName = node.getImportClause()?.getText();
           const moduleName = ts.resolveModuleName(
             importText,
             currentFilePath,
@@ -117,9 +118,23 @@ export const migrateToNamedExport = () => {
           const resolvedFileName = moduleName.resolvedModule?.resolvedFileName;
           if (resolvedFileName) {
             const importName = pathsWithExports[resolvedFileName];
-            if (importName) {
+            if (importedAsName) {
               replaceDefaultImportToNamedImport(node, importName);
+              if (importedAsName !== importName) {
+                renamedImport[importedAsName] = importName;
+              }
             }
+          }
+        }
+
+        if (
+          Node.isIdentifier(node) &&
+          !Node.isImportSpecifier(node.getParent())
+        ) {
+          const identifierText = node.getText();
+          const originName = renamedImport[identifierText];
+          if (originName) {
+            node.replaceWithText(originName);
           }
         }
       });
@@ -129,4 +144,4 @@ export const migrateToNamedExport = () => {
   return project.save();
 };
 
-// migrateToNamedExport();
+migrateToNamedExport();
