@@ -6,7 +6,8 @@ import { prepareTestCases } from './helper';
 
 beforeAll(async () => {
   await migrateToNamedExport({
-    start: 'test-project/A-usage.ts',
+    projectFiles: 'test/test-project/**/*.ts',
+    start: 'test/test-project/A-usage.ts',
   });
 });
 

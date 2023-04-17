@@ -60,8 +60,8 @@ const replaceDefaultImportToNamedImport = (
   });
 };
 
-const getSourceFilesMap = (project: Project) => {
-  const sourceFiles = project.getSourceFiles('test-project/**/*.ts');
+const getSourceFilesMap = (project: Project, config: Config) => {
+  const sourceFiles = project.getSourceFiles(config.projectFiles);
 
   return sourceFiles.reduce((acc, sourceFile) => {
     acc[path.relative(process.cwd(), sourceFile.getFilePath())] = sourceFile;
@@ -79,6 +79,7 @@ const getDependencyGraph = (config: Config) => {
 };
 
 type Config = {
+  projectFiles: string;
   start: string;
 };
 
@@ -89,7 +90,7 @@ export const migrateToNamedExport = (config: Config) => {
     // skipFileDependencyResolution: true,
   });
 
-  const sourceFilesMap = getSourceFilesMap(project);
+  const sourceFilesMap = getSourceFilesMap(project, config);
   const tsConfig = getTsConfig();
   const dependencyGraph = getDependencyGraph(config);
 
@@ -149,5 +150,6 @@ export const migrateToNamedExport = (config: Config) => {
 };
 
 // migrateToNamedExport({
+//   projectFiles: 'test/test-project/**/*.ts',
 //   start: 'test/test-project/A-usage.ts',
 // });
