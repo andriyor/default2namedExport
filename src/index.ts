@@ -57,10 +57,7 @@ const setIsExportedByDefaultName = (node: Node, defaultExportName: string) => {
   }
 };
 
-const replaceDefaultImportToNamedImport = (
-  importDeclaration: ImportDeclaration,
-  name: string
-) => {
+const replaceDefaultImportToNamedImport = (importDeclaration: ImportDeclaration, name: string) => {
   importDeclaration.set({
     defaultImport: undefined,
     namedImports: [
@@ -95,12 +92,7 @@ const getResolvedFileName = (
   tsOptions: CompilerOptions
 ) => {
   const moduleName = trimQuotes(moduleSpecifier.getText());
-  const resolvedModuleName = ts.resolveModuleName(
-    moduleName,
-    containingFile,
-    tsOptions,
-    ts.sys
-  );
+  const resolvedModuleName = ts.resolveModuleName(moduleName, containingFile, tsOptions, ts.sys);
   return resolvedModuleName.resolvedModule?.resolvedFileName;
 };
 
@@ -121,21 +113,22 @@ export const migrateToNamedExport = (config: Config) => {
   const dependencyGraph = getDependencyGraph(config);
 
   if (tsConfig) {
-    const pathsWithExports: Record<string, string[]> = {};
+    // TODO: change structure to separate index file with many exports and file with single export default?
+    const pathsWithExports: Record<string, Record<string, string>[]> = {};
+    const renamedImport: Record<string, string> = {};
 
     for (const node of dependencyGraph.nodes.reverse()) {
       const sourceFile = sourceFilesMap[node.path];
-      const currentFilePath = sourceFile.getFilePath();
+      const currentFilePath: string = sourceFile.getFilePath();
 
       const defaultExportName = getDefaultExportName(sourceFile);
       if (defaultExportName) {
         sourceFile.forEachDescendant((node) => {
           setIsExportedByDefaultName(node, defaultExportName);
-          pathsWithExports[currentFilePath] = [defaultExportName];
+          pathsWithExports[currentFilePath] = [{ [defaultExportName]: defaultExportName }];
         });
       }
 
-      const renamedImport: Record<string, string> = {};
       sourceFile.forEachDescendant((node) => {
         if (Node.isExportDeclaration(node)) {
           const moduleSpecifier = node.getModuleSpecifier();
@@ -153,13 +146,20 @@ export const migrateToNamedExport = (config: Config) => {
                 for (const resolvedFileNameElement of node.getNamedExports()) {
                   if (Node.isExportSpecifier(resolvedFileNameElement)) {
                     const name = resolvedFileNameElement.getName();
-                    const exportedName = exportedNames[0];
+                    const alias = resolvedFileNameElement.getAliasNode()?.getText() || name;
+                    const exportedName = Object.keys(exportedNames[0])[0];
+                    const aliasKey = alias === 'default' ? exportedName : alias;
+
+                    if (aliasKey !== exportedName) {
+                      renamedImport[aliasKey] = exportedName;
+                    }
+
                     if (name === 'default' && exportedName) {
                       resolvedFileNameElement.set({ name: exportedName, alias: undefined });
                       if (pathsWithExports[currentFilePath]) {
-                        pathsWithExports[currentFilePath].push(exportedName)
+                        pathsWithExports[currentFilePath].push({ [aliasKey]: exportedName });
                       } else {
-                        pathsWithExports[currentFilePath] = [exportedName];
+                        pathsWithExports[currentFilePath] = [{ [aliasKey]: exportedName }];
                       }
                     }
                   }
@@ -172,11 +172,11 @@ export const migrateToNamedExport = (config: Config) => {
         if (Node.isImportDeclaration(node)) {
           let importedAsName = '';
           const importClauseText = node.getImportClause()?.getText() || '';
-          const namedImports = node.getNamedImports().map(element => element.getName());
+          const namedImports = node.getNamedImports().map((element) => element.getName());
           if (namedImports.length) {
             importedAsName = namedImports[0];
           } else {
-            importedAsName = importClauseText
+            importedAsName = importClauseText;
           }
 
           const moduleSpecifier = node.getModuleSpecifier();
@@ -190,13 +190,15 @@ export const migrateToNamedExport = (config: Config) => {
           if (resolvedFileName) {
             const exportedNames = pathsWithExports[resolvedFileName];
             if (exportedNames) {
-              const exportedName = exportedNames.find(name => name === importedAsName);
+              const exportedName = exportedNames.find((name) => name[importedAsName]);
               if (importedAsName) {
                 if (exportedName) {
-                  replaceDefaultImportToNamedImport(node, exportedName);
+                  replaceDefaultImportToNamedImport(node, exportedName[importedAsName]);
                 } else {
-                  replaceDefaultImportToNamedImport(node, exportedNames[0]);
-                  renamedImport[importedAsName] = exportedNames[0];
+                  // to handle renamed import
+                  const exportedName = Object.keys(exportedNames[0])[0];
+                  replaceDefaultImportToNamedImport(node, exportedName);
+                  renamedImport[importedAsName] = exportedName;
                 }
               }
             }
@@ -205,13 +207,13 @@ export const migrateToNamedExport = (config: Config) => {
 
         // use named export name instead of renamed default
         // TODO: optimize
-        if (
-          Node.isIdentifier(node) &&
-          !Node.isImportSpecifier(node.getParent())
-        ) {
+        if (Node.isIdentifier(node) && !Node.isImportSpecifier(node.getParent())) {
           const identifierText = node.getText();
           const originName = renamedImport[identifierText];
           if (originName && typeof originName === 'string') {
+            // TODO: use rename?
+            // 1) rename default export
+            // 2) change to named export
             node.replaceWithText(originName);
           }
         }
@@ -226,7 +228,6 @@ export const migrateToNamedExport = (config: Config) => {
 //   projectFiles: 'test/test-project/**/*.ts',
 //   start: 'test/test-project/A-usage.ts',
 // });
-
 
 // migrateToNamedExport({
 //   projectFiles: 'src/**/*.{tsx,ts,js}',

@@ -7,6 +7,6 @@
 - [x] imported from file with `export default`  with different name
 - [x] index file with `export { default } from './module';`
 - [x] index file with multiple `export { default as method } from './module';`
-- [ ] imported from index file with `export { default as method } from './module';`  with different name
-- [ ] paths in `tsconfig.json`
+- [x] imported from index file with `export { default as method } from './module';`  with different name
+- [x] paths in `tsconfig.json`
 - [ ] run as CLI
