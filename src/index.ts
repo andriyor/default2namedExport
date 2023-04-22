@@ -40,13 +40,19 @@ const getDefaultExportName = (sourceFile: SourceFile) => {
   }
 };
 
-const addExportToVariable = (node: Node, defaultExportName: string) => {
+const setIsExportedByDefaultName = (node: Node, defaultExportName: string) => {
   if (Node.isVariableStatement(node)) {
     for (const declarations of node.getDeclarations()) {
       const varName = declarations.getName();
       if (defaultExportName === varName) {
         node.setIsExported(true);
       }
+    }
+  }
+  if (Node.isTypeAliasDeclaration(node)) {
+    const typeName = node.getName();
+    if (defaultExportName === typeName) {
+      node.setIsExported(true);
     }
   }
 };
@@ -124,7 +130,7 @@ export const migrateToNamedExport = (config: Config) => {
       const defaultExportName = getDefaultExportName(sourceFile);
       if (defaultExportName) {
         sourceFile.forEachDescendant((node) => {
-          addExportToVariable(node, defaultExportName);
+          setIsExportedByDefaultName(node, defaultExportName);
           pathsWithExports[currentFilePath] = [defaultExportName];
         });
       }
@@ -215,7 +221,7 @@ export const migrateToNamedExport = (config: Config) => {
 
   return project.save();
 };
-//
+
 // migrateToNamedExport({
 //   projectFiles: 'test/test-project/**/*.ts',
 //   start: 'test/test-project/A-usage.ts',
