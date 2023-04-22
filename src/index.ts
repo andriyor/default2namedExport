@@ -143,16 +143,18 @@ export const migrateToNamedExport = (config: Config) => {
             if (resolvedFileName) {
               const exportedNames = pathsWithExports[resolvedFileName];
 
-              for (const resolvedFileNameElement of node.getNamedExports()) {
-                if (Node.isExportSpecifier(resolvedFileNameElement)) {
-                  const name = resolvedFileNameElement.getName();
-                  const exportedName = exportedNames[0];
-                  if (name === 'default' && exportedName) {
-                    resolvedFileNameElement.set({ name: exportedName, alias: undefined });
-                    if (pathsWithExports[currentFilePath]) {
-                      pathsWithExports[currentFilePath].push(exportedName)
-                    } else {
-                      pathsWithExports[currentFilePath] = [exportedName];
+              if (exportedNames) {
+                for (const resolvedFileNameElement of node.getNamedExports()) {
+                  if (Node.isExportSpecifier(resolvedFileNameElement)) {
+                    const name = resolvedFileNameElement.getName();
+                    const exportedName = exportedNames[0];
+                    if (name === 'default' && exportedName) {
+                      resolvedFileNameElement.set({ name: exportedName, alias: undefined });
+                      if (pathsWithExports[currentFilePath]) {
+                        pathsWithExports[currentFilePath].push(exportedName)
+                      } else {
+                        pathsWithExports[currentFilePath] = [exportedName];
+                      }
                     }
                   }
                 }
@@ -181,26 +183,29 @@ export const migrateToNamedExport = (config: Config) => {
 
           if (resolvedFileName) {
             const exportedNames = pathsWithExports[resolvedFileName];
-            const exportedName = exportedNames.find(name => name === importedAsName);
-            if (importedAsName) {
-              if (exportedName) {
-                replaceDefaultImportToNamedImport(node, exportedName);
-              } else {
-                replaceDefaultImportToNamedImport(node, exportedNames[0]);
-                renamedImport[importedAsName] = exportedNames[0];
+            if (exportedNames) {
+              const exportedName = exportedNames.find(name => name === importedAsName);
+              if (importedAsName) {
+                if (exportedName) {
+                  replaceDefaultImportToNamedImport(node, exportedName);
+                } else {
+                  replaceDefaultImportToNamedImport(node, exportedNames[0]);
+                  renamedImport[importedAsName] = exportedNames[0];
+                }
               }
             }
           }
         }
 
         // use named export name instead of renamed default
+        // TODO: optimize
         if (
           Node.isIdentifier(node) &&
           !Node.isImportSpecifier(node.getParent())
         ) {
           const identifierText = node.getText();
           const originName = renamedImport[identifierText];
-          if (originName) {
+          if (originName && typeof originName === 'string') {
             node.replaceWithText(originName);
           }
         }
@@ -210,8 +215,14 @@ export const migrateToNamedExport = (config: Config) => {
 
   return project.save();
 };
-
+//
 // migrateToNamedExport({
 //   projectFiles: 'test/test-project/**/*.ts',
 //   start: 'test/test-project/A-usage.ts',
 // });
+
+
+migrateToNamedExport({
+  projectFiles: 'src/**/*.{tsx,ts,js}',
+  start: 'src/pages/balance/index.page.tsx',
+});
