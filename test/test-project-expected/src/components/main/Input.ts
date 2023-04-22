@@ -1,5 +1,5 @@
 import { helper } from '../../helper/helper';
-import User from '../..//types/basic';
+import { User } from '../../types/basic';
 
 export const Input = () => {
   helper();

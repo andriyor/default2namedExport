@@ -222,7 +222,7 @@ export const migrateToNamedExport = (config: Config) => {
 // });
 
 
-migrateToNamedExport({
-  projectFiles: 'src/**/*.{tsx,ts,js}',
-  start: 'src/pages/balance/index.page.tsx',
-});
+// migrateToNamedExport({
+//   projectFiles: 'src/**/*.{tsx,ts,js}',
+//   start: 'src/pages/balance/index.page.tsx',
+// });
