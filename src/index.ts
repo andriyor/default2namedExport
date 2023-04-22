@@ -115,7 +115,7 @@ export const migrateToNamedExport = (config: Config) => {
   const dependencyGraph = getDependencyGraph(config);
 
   if (tsConfig) {
-    const pathsWithExports: Record<string, string> = {};
+    const pathsWithExports: Record<string, string[]> = {};
 
     for (const node of dependencyGraph.nodes.reverse()) {
       const sourceFile = sourceFilesMap[node.path];
@@ -125,7 +125,7 @@ export const migrateToNamedExport = (config: Config) => {
       if (defaultExportName) {
         sourceFile.forEachDescendant((node) => {
           addExportToVariable(node, defaultExportName);
-          pathsWithExports[currentFilePath] = defaultExportName;
+          pathsWithExports[currentFilePath] = [defaultExportName];
         });
       }
 
@@ -141,14 +141,19 @@ export const migrateToNamedExport = (config: Config) => {
             );
 
             if (resolvedFileName) {
-              const exportedName = pathsWithExports[resolvedFileName];
+              const exportedNames = pathsWithExports[resolvedFileName];
 
               for (const resolvedFileNameElement of node.getNamedExports()) {
                 if (Node.isExportSpecifier(resolvedFileNameElement)) {
                   const name = resolvedFileNameElement.getName();
-                  if (name === 'default') {
-                    resolvedFileNameElement.set({ name: exportedName });
-                    pathsWithExports[currentFilePath] = exportedName;
+                  const exportedName = exportedNames[0];
+                  if (name === 'default' && exportedName) {
+                    resolvedFileNameElement.set({ name: exportedName, alias: undefined });
+                    if (pathsWithExports[currentFilePath]) {
+                      pathsWithExports[currentFilePath].push(exportedName)
+                    } else {
+                      pathsWithExports[currentFilePath] = [exportedName];
+                    }
                   }
                 }
               }
@@ -157,7 +162,15 @@ export const migrateToNamedExport = (config: Config) => {
         }
 
         if (Node.isImportDeclaration(node)) {
-          const importedAsName = node.getImportClause()?.getText();
+          let importedAsName = '';
+          const importClauseText = node.getImportClause()?.getText() || '';
+          const namedImports = node.getNamedImports().map(element => element.getName());
+          if (namedImports.length) {
+            importedAsName = namedImports[0];
+          } else {
+            importedAsName = importClauseText
+          }
+
           const moduleSpecifier = node.getModuleSpecifier();
 
           const resolvedFileName = getResolvedFileName(
@@ -167,11 +180,14 @@ export const migrateToNamedExport = (config: Config) => {
           );
 
           if (resolvedFileName) {
-            const exportedName = pathsWithExports[resolvedFileName];
+            const exportedNames = pathsWithExports[resolvedFileName];
+            const exportedName = exportedNames.find(name => name === importedAsName);
             if (importedAsName) {
-              replaceDefaultImportToNamedImport(node, exportedName);
-              if (importedAsName !== exportedName) {
-                renamedImport[importedAsName] = exportedName;
+              if (exportedName) {
+                replaceDefaultImportToNamedImport(node, exportedName);
+              } else {
+                replaceDefaultImportToNamedImport(node, exportedNames[0]);
+                renamedImport[importedAsName] = exportedNames[0];
               }
             }
           }
