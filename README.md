@@ -9,4 +9,5 @@
 - [x] index file with multiple `export { default as method } from './module';`
 - [x] imported from index file with `export { default as method } from './module';`  with different name
 - [x] paths in `tsconfig.json`
+- [x] fix usage outside of graph
 - [ ] run as CLI
