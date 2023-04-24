@@ -103,12 +103,44 @@ type Config = {
 
 type PathWithExports = Record<string, string>;
 
-const handleImport = (
+const handleDefaultExportUsage = (
   node: Node,
   currentFilePath: string,
   tsConfigOptions: CompilerOptions,
   pathsWithExports: PathWithExports,
 ) => {
+  if (Node.isExportDeclaration(node)) {
+    const moduleSpecifier = node.getModuleSpecifier();
+    if (moduleSpecifier) {
+      const resolvedFileName = getResolvedFileName(
+        moduleSpecifier,
+        currentFilePath,
+        tsConfigOptions
+      );
+
+      if (resolvedFileName) {
+        const exportedNames = pathsWithExports[resolvedFileName];
+
+        if (exportedNames) {
+          for (const resolvedFileNameElement of node.getNamedExports()) {
+            if (Node.isExportSpecifier(resolvedFileNameElement)) {
+              const alias = resolvedFileNameElement.getAliasNode()?.getText();
+              const exportedName = exportedNames;
+
+              if (alias) {
+                resolvedFileNameElement.setName(exportedName);
+                resolvedFileNameElement.removeAliasWithRename();
+              } else {
+                resolvedFileNameElement.setName(exportedName);
+                pathsWithExports[currentFilePath] = exportedName;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (Node.isImportDeclaration(node)) {
     const namedImports = node.getNamedImports();
 
@@ -160,49 +192,18 @@ export const migrateToNamedExport = (config: Config) => {
       }
 
       sourceFile.forEachDescendant((node) => {
-        if (Node.isExportDeclaration(node)) {
-          const moduleSpecifier = node.getModuleSpecifier();
-          if (moduleSpecifier) {
-            const resolvedFileName = getResolvedFileName(
-              moduleSpecifier,
-              currentFilePath,
-              tsConfig.options
-            );
-
-            if (resolvedFileName) {
-              const exportedNames = pathsWithExports[resolvedFileName];
-
-              if (exportedNames) {
-                for (const resolvedFileNameElement of node.getNamedExports()) {
-                  if (Node.isExportSpecifier(resolvedFileNameElement)) {
-                    const alias = resolvedFileNameElement.getAliasNode()?.getText();
-                    const exportedName = exportedNames;
-
-                    if (alias) {
-                      resolvedFileNameElement.setName(exportedName);
-                      resolvedFileNameElement.removeAliasWithRename();
-                    } else {
-                      resolvedFileNameElement.setName(exportedName);
-                      pathsWithExports[currentFilePath] = exportedName;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        handleImport(node, currentFilePath, tsConfig.options, pathsWithExports);
+        handleDefaultExportUsage(node, currentFilePath, tsConfig.options, pathsWithExports);
       });
     }
 
+    // handle files outside of graph
     for (const sourceFile of sourceFiles) {
       const sourceFilePath = sourceFile.getFilePath();
       if (!graphNodesPath.includes(sourceFilePath)) {
         const currentFilePath = sourceFilePath;
 
         sourceFile.forEachDescendant((node) => {
-          handleImport(node, currentFilePath, tsConfig.options, pathsWithExports);
+          handleDefaultExportUsage(node, currentFilePath, tsConfig.options, pathsWithExports);
         });
       }
     }
