@@ -13,6 +13,8 @@ import {
 import { GraphOptions } from 'ts_dependency_graph';
 import * as lib from 'ts_dependency_graph/dist/lib';
 
+const cwd = process.cwd();
+
 export const trimQuotes = (str: string) => {
   return str.slice(1, -1);
 };
@@ -33,7 +35,7 @@ const getDefaultExportName = (sourceFile: SourceFile) => {
       const expression = defaultExportDeclaration.getExpression();
       if (Node.isIdentifier(expression)) {
         const defaultExportName = expression.getText();
-        defaultExportDeclaration.remove();
+        sourceFile.removeDefaultExport();
         return defaultExportName;
       }
     }
@@ -70,8 +72,7 @@ const replaceDefaultImportToNamedImport = (importDeclaration: ImportDeclaration,
 
 const getSourceFilesMap = (sourceFiles: SourceFile[]) => {
   return sourceFiles.reduce((acc, sourceFile) => {
-    // TODO: change graph paths instead of source file to improve performance
-    acc[path.relative(process.cwd(), sourceFile.getFilePath())] = sourceFile;
+    acc[sourceFile.getFilePath()] = sourceFile;
     return acc;
   }, {} as Record<string, SourceFile>);
 };
@@ -115,7 +116,9 @@ const handleImport = (
     const resolvedFileName = getResolvedFileName(moduleSpecifier, currentFilePath, tsConfigOptions);
 
     if (resolvedFileName) {
-      const exportedName = pathsWithExports[resolvedFileName];
+      // TODO: find better way to fix path
+      const fixedPath = resolvedFileName.includes(cwd) ? resolvedFileName : path.join(cwd, resolvedFileName);
+      const exportedName = pathsWithExports[fixedPath];
       if (exportedName) {
         if (!namedImports.length) {
           node.renameDefaultImport(exportedName);
@@ -139,16 +142,15 @@ export const migrateToNamedExport = (config: Config) => {
   const dependencyGraph = getDependencyGraph(config);
 
   if (tsConfig) {
-    // TODO: change structure to separate index file with many exports and file with single export default?
     const pathsWithExports: PathWithExports = {};
-
-    const graphNodes = dependencyGraph.nodes.map((node) => node.path).reverse();
-    for (const nodePath of graphNodes) {
+    const graphNodesPath = dependencyGraph.nodes.map((node) => path.join(cwd, node.path));
+    for (const nodePath of graphNodesPath.reverse()) {
       const sourceFile = sourceFilesMap[nodePath];
       const currentFilePath = sourceFile.getFilePath();
 
       // TODO: move to single forEachDescendant to improve performance
-      // TODO: use ts-morph renaming
+      // TODO: use ts-morph renaming https://github.com/microsoft/TypeScript/pull/24878
+      // TODO: use getDescendantsOfKind
       const defaultExportName = getDefaultExportName(sourceFile);
       if (defaultExportName) {
         sourceFile.forEachDescendant((node) => {
@@ -194,10 +196,10 @@ export const migrateToNamedExport = (config: Config) => {
       });
     }
 
-    const graphNodesAbsolute = graphNodes.map((nodePath) => path.join(process.cwd(), nodePath));
     for (const sourceFile of sourceFiles) {
-      if (!graphNodesAbsolute.includes(sourceFile.getFilePath())) {
-        const currentFilePath = sourceFile.getFilePath();
+      const sourceFilePath = sourceFile.getFilePath();
+      if (!graphNodesPath.includes(sourceFilePath)) {
+        const currentFilePath = sourceFilePath;
 
         sourceFile.forEachDescendant((node) => {
           handleImport(node, currentFilePath, tsConfig.options, pathsWithExports);
@@ -215,6 +217,6 @@ export const migrateToNamedExport = (config: Config) => {
 // });
 
 // migrateToNamedExport({
-//   projectFiles: 'src/**/*.{tsx,ts,js}',
+//   projectFiles: '**/*.{tsx,ts,js}',
 //   start: 'src/pages/balance/index.page.tsx',
 // });
