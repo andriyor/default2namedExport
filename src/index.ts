@@ -100,57 +100,28 @@ type Config = {
   start: string;
 };
 
-type PathWithExports = Record<string, Record<string, string>[]>;
-type RenamedImport = Record<string, string>;
+type PathWithExports = Record<string, string>;
 
 const handleImport = (
   node: Node,
   currentFilePath: string,
   tsConfigOptions: CompilerOptions,
   pathsWithExports: PathWithExports,
-  renamedImport: RenamedImport
 ) => {
   if (Node.isImportDeclaration(node)) {
-    let importedAsName = '';
-    const importClauseText = node.getImportClause()?.getText() || '';
-    const namedImports = node.getNamedImports().map((element) => element.getName());
-    if (namedImports.length) {
-      importedAsName = namedImports[0];
-    } else {
-      importedAsName = importClauseText;
-    }
+    const namedImports = node.getNamedImports();
 
     const moduleSpecifier = node.getModuleSpecifier();
     const resolvedFileName = getResolvedFileName(moduleSpecifier, currentFilePath, tsConfigOptions);
 
     if (resolvedFileName) {
-      const exportedNames = pathsWithExports[resolvedFileName];
-      if (exportedNames) {
-        const exportedName = exportedNames.find((name) => name[importedAsName]);
-        if (importedAsName) {
-          if (exportedName) {
-            replaceDefaultImportToNamedImport(node, exportedName[importedAsName]);
-          } else {
-            // to handle renamed import
-            const exportedName = Object.keys(exportedNames[0])[0];
-            replaceDefaultImportToNamedImport(node, exportedName);
-            renamedImport[importedAsName] = exportedName;
-          }
+      const exportedName = pathsWithExports[resolvedFileName];
+      if (exportedName) {
+        if (!namedImports.length) {
+          node.renameDefaultImport(exportedName);
+          replaceDefaultImportToNamedImport(node, exportedName);
         }
       }
-    }
-  }
-
-  // use named export name instead of renamed default
-  // TODO: optimize
-  if (Node.isIdentifier(node) && !Node.isImportSpecifier(node.getParent())) {
-    const identifierText = node.getText();
-    const originName = renamedImport[identifierText];
-    if (originName && typeof originName === 'string') {
-      // TODO: use rename?
-      // 1) rename default export
-      // 2) change to named export
-      node.replaceWithText(originName);
     }
   }
 };
@@ -170,7 +141,6 @@ export const migrateToNamedExport = (config: Config) => {
   if (tsConfig) {
     // TODO: change structure to separate index file with many exports and file with single export default?
     const pathsWithExports: PathWithExports = {};
-    const renamedImport: RenamedImport = {};
 
     const graphNodes = dependencyGraph.nodes.map((node) => node.path).reverse();
     for (const nodePath of graphNodes) {
@@ -178,11 +148,12 @@ export const migrateToNamedExport = (config: Config) => {
       const currentFilePath = sourceFile.getFilePath();
 
       // TODO: move to single forEachDescendant to improve performance
+      // TODO: use ts-morph renaming
       const defaultExportName = getDefaultExportName(sourceFile);
       if (defaultExportName) {
         sourceFile.forEachDescendant((node) => {
           setIsExportedByDefaultName(node, defaultExportName);
-          pathsWithExports[currentFilePath] = [{ [defaultExportName]: defaultExportName }];
+          pathsWithExports[currentFilePath] = defaultExportName;
         });
       }
 
@@ -202,22 +173,15 @@ export const migrateToNamedExport = (config: Config) => {
               if (exportedNames) {
                 for (const resolvedFileNameElement of node.getNamedExports()) {
                   if (Node.isExportSpecifier(resolvedFileNameElement)) {
-                    const name = resolvedFileNameElement.getName();
-                    const alias = resolvedFileNameElement.getAliasNode()?.getText() || name;
-                    const exportedName = Object.keys(exportedNames[0])[0];
-                    const aliasKey = alias === 'default' ? exportedName : alias;
+                    const alias = resolvedFileNameElement.getAliasNode()?.getText();
+                    const exportedName = exportedNames;
 
-                    if (aliasKey !== exportedName) {
-                      renamedImport[aliasKey] = exportedName;
-                    }
-
-                    if (name === 'default' && exportedName) {
-                      resolvedFileNameElement.set({ name: exportedName, alias: undefined });
-                      if (pathsWithExports[currentFilePath]) {
-                        pathsWithExports[currentFilePath].push({ [aliasKey]: exportedName });
-                      } else {
-                        pathsWithExports[currentFilePath] = [{ [aliasKey]: exportedName }];
-                      }
+                    if (alias) {
+                      resolvedFileNameElement.setName(exportedName);
+                      resolvedFileNameElement.removeAliasWithRename();
+                    } else {
+                      resolvedFileNameElement.setName(exportedName);
+                      pathsWithExports[currentFilePath] = exportedName;
                     }
                   }
                 }
@@ -226,7 +190,7 @@ export const migrateToNamedExport = (config: Config) => {
           }
         }
 
-        handleImport(node, currentFilePath, tsConfig.options, pathsWithExports, renamedImport);
+        handleImport(node, currentFilePath, tsConfig.options, pathsWithExports);
       });
     }
 
@@ -236,7 +200,7 @@ export const migrateToNamedExport = (config: Config) => {
         const currentFilePath = sourceFile.getFilePath();
 
         sourceFile.forEachDescendant((node) => {
-          handleImport(node, currentFilePath, tsConfig.options, pathsWithExports, renamedImport);
+          handleImport(node, currentFilePath, tsConfig.options, pathsWithExports);
         });
       }
     }
