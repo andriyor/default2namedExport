@@ -59,14 +59,16 @@ const setIsExportedByDefaultName = (node: Node, defaultExportName: string) => {
   }
 };
 
-const replaceDefaultImportToNamedImport = (importDeclaration: ImportDeclaration, name: string) => {
+const replaceDefaultImportToNamedImport = (
+  importDeclaration: ImportDeclaration,
+  names: string[]
+) => {
+  const namedImports = names.map((name) => {
+    return { name };
+  });
   importDeclaration.set({
     defaultImport: undefined,
-    namedImports: [
-      {
-        name,
-      },
-    ],
+    namedImports: namedImports,
   });
 };
 
@@ -108,6 +110,7 @@ const handleDefaultExportUsage = (
   currentFilePath: string,
   tsConfigOptions: CompilerOptions,
   pathsWithExports: PathWithExports,
+  fixedInFile: string[]
 ) => {
   if (Node.isExportDeclaration(node)) {
     const moduleSpecifier = node.getModuleSpecifier();
@@ -124,13 +127,15 @@ const handleDefaultExportUsage = (
         if (exportedNames) {
           for (const resolvedFileNameElement of node.getNamedExports()) {
             if (Node.isExportSpecifier(resolvedFileNameElement)) {
+              const name = resolvedFileNameElement.getName();
               const alias = resolvedFileNameElement.getAliasNode()?.getText();
               const exportedName = exportedNames;
 
               if (alias) {
                 resolvedFileNameElement.setName(exportedName);
                 resolvedFileNameElement.removeAliasWithRename();
-              } else {
+              }
+              if (!alias && name === 'default') {
                 resolvedFileNameElement.setName(exportedName);
                 pathsWithExports[currentFilePath] = exportedName;
               }
@@ -143,19 +148,21 @@ const handleDefaultExportUsage = (
 
   if (Node.isImportDeclaration(node)) {
     const namedImports = node.getNamedImports();
+    const namedImportsNames = namedImports.map((namedImport) => namedImport.getName());
 
     const moduleSpecifier = node.getModuleSpecifier();
     const resolvedFileName = getResolvedFileName(moduleSpecifier, currentFilePath, tsConfigOptions);
 
     if (resolvedFileName) {
       // TODO: find better way to fix path
-      const fixedPath = resolvedFileName.includes(cwd) ? resolvedFileName : path.join(cwd, resolvedFileName);
+      const fixedPath = resolvedFileName.includes(cwd)
+        ? resolvedFileName
+        : path.join(cwd, resolvedFileName);
       const exportedName = pathsWithExports[fixedPath];
-      if (exportedName) {
-        if (!namedImports.length) {
-          node.renameDefaultImport(exportedName);
-          replaceDefaultImportToNamedImport(node, exportedName);
-        }
+      if (exportedName && !fixedInFile.includes(fixedPath)) {
+        node.renameDefaultImport(exportedName);
+        replaceDefaultImportToNamedImport(node, [...namedImportsNames, exportedName]);
+        fixedInFile.push(fixedPath);
       }
     }
   }
@@ -191,8 +198,16 @@ export const migrateToNamedExport = (config: Config) => {
         });
       }
 
+      // to support mixed imports of same file on next lines
+      const fixedInFile: string[] = [];
       sourceFile.forEachDescendant((node) => {
-        handleDefaultExportUsage(node, currentFilePath, tsConfig.options, pathsWithExports);
+        handleDefaultExportUsage(
+          node,
+          currentFilePath,
+          tsConfig.options,
+          pathsWithExports,
+          fixedInFile
+        );
       });
     }
 
@@ -201,9 +216,15 @@ export const migrateToNamedExport = (config: Config) => {
       const sourceFilePath = sourceFile.getFilePath();
       if (!graphNodesPath.includes(sourceFilePath)) {
         const currentFilePath = sourceFilePath;
-
+        const fixedInFile: string[] = [];
         sourceFile.forEachDescendant((node) => {
-          handleDefaultExportUsage(node, currentFilePath, tsConfig.options, pathsWithExports);
+          handleDefaultExportUsage(
+            node,
+            currentFilePath,
+            tsConfig.options,
+            pathsWithExports,
+            fixedInFile
+          );
         });
       }
     }

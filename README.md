@@ -10,5 +10,6 @@
 - [x] imported from index file with `export { default as method } from './module';`  with different name
 - [x] paths in `tsconfig.json`
 - [x] fix usage outside of graph
-- [ ] handle mixed imports `import COmponent, { Props } from './component';`
+- [x] handle mixed imports `import COmponent, { Props } from './component';`
 - [ ] run as CLI
+- [ ] progress bar and stats
