@@ -148,6 +148,7 @@ const handleDefaultExportUsage = (
 
   if (Node.isImportDeclaration(node)) {
     const namedImports = node.getNamedImports();
+    const importClauseSymbol = node.getImportClause()?.getSymbol();
     const namedImportsNames = namedImports.map((namedImport) => namedImport.getName());
 
     const moduleSpecifier = node.getModuleSpecifier();
@@ -159,7 +160,7 @@ const handleDefaultExportUsage = (
         ? resolvedFileName
         : path.join(cwd, resolvedFileName);
       const exportedName = pathsWithExports[fixedPath];
-      if (exportedName && !fixedInFile.includes(fixedPath)) {
+      if (importClauseSymbol && exportedName && !fixedInFile.includes(fixedPath)) {
         node.renameDefaultImport(exportedName);
         replaceDefaultImportToNamedImport(node, [...namedImportsNames, exportedName]);
         fixedInFile.push(fixedPath);
@@ -238,7 +239,7 @@ export const migrateToNamedExport = (config: Config) => {
 //   start: 'test/test-project/A-usage.ts',
 // });
 
-// migrateToNamedExport({
-//   projectFiles: '**/*.{tsx,ts,js}',
-//   start: 'src/pages/balance/index.page.tsx',
-// });
+migrateToNamedExport({
+  projectFiles: '**/*.{tsx,ts,js}',
+  start: 'src/pages/balance/index.page.tsx',
+});
