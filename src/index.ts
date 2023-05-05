@@ -1,31 +1,4 @@
-import path from 'path';
-import process from 'process';
-
-import ts from 'typescript';
-import {
-  Project,
-  Node,
-  SourceFile,
-  ImportDeclaration,
-  CompilerOptions,
-  StringLiteral,
-} from 'ts-morph';
-import { GraphOptions } from 'ts_dependency_graph';
-import * as lib from 'ts_dependency_graph/dist/lib';
-
-const cwd = process.cwd();
-
-export const trimQuotes = (str: string) => {
-  return str.slice(1, -1);
-};
-
-const getTsConfig = () => {
-  const tsConfigFilePath = ts.findConfigFile(process.cwd(), ts.sys.fileExists);
-  if (tsConfigFilePath) {
-    const configFile = ts.readConfigFile(tsConfigFilePath, ts.sys.readFile);
-    return ts.parseJsonConfigFileContent(configFile.config, ts.sys, '');
-  }
-};
+import { Node, Project, SourceFile, SyntaxKind } from 'ts-morph';
 
 const getDefaultExportName = (sourceFile: SourceFile) => {
   const defaultExportSymbol = sourceFile.getDefaultExportSymbol();
@@ -34,9 +7,7 @@ const getDefaultExportName = (sourceFile: SourceFile) => {
     if (Node.isExportAssignment(defaultExportDeclaration)) {
       const expression = defaultExportDeclaration.getExpression();
       if (Node.isIdentifier(expression)) {
-        const defaultExportName = expression.getText();
-        sourceFile.removeDefaultExport();
-        return defaultExportName;
+        return expression.getText();
       }
     }
   }
@@ -59,187 +30,95 @@ const setIsExportedByDefaultName = (node: Node, defaultExportName: string) => {
   }
 };
 
-const replaceDefaultImportToNamedImport = (
-  importDeclaration: ImportDeclaration,
-  names: string[]
-) => {
-  const namedImports = names.map((name) => {
-    return { name };
+export const migrateToNamedExport = (projectFiles: string) => {
+  const project = new Project({
+    tsConfigFilePath: 'tsconfig.json',
   });
-  importDeclaration.set({
-    defaultImport: undefined,
-    namedImports: namedImports,
-  });
-};
 
-const getSourceFilesMap = (sourceFiles: SourceFile[]) => {
-  return sourceFiles.reduce((acc, sourceFile) => {
-    acc[sourceFile.getFilePath()] = sourceFile;
-    return acc;
-  }, {} as Record<string, SourceFile>);
-};
+  const sourceFiles = project.getSourceFiles(projectFiles);
+  const sourceFilesWithoutPages = sourceFiles.filter(
+    (sourceFile) => !sourceFile.getFilePath().includes('.page.ts')
+  );
 
-const getDependencyGraph = (config: Config) => {
-  const options: GraphOptions = {
-    start: config.start,
-    graph_folder: false,
-  };
+  for (const sourceFile of sourceFilesWithoutPages) {
+    const defaultExportName = getDefaultExportName(sourceFile);
 
-  return lib.get_graph(options);
-};
+    if (defaultExportName) {
+      sourceFile.forEachDescendant((node) => {
+        setIsExportedByDefaultName(node, defaultExportName);
 
-const getResolvedFileName = (
-  moduleSpecifier: StringLiteral,
-  containingFile: string,
-  tsOptions: CompilerOptions
-) => {
-  const moduleName = trimQuotes(moduleSpecifier.getText());
-  const resolvedModuleName = ts.resolveModuleName(moduleName, containingFile, tsOptions, ts.sys);
-  return resolvedModuleName.resolvedModule?.resolvedFileName;
-};
+        if (Node.isExportAssignment(node)) {
+          const edits = project
+            .getLanguageService()
+            .getEditsForRefactor(
+              sourceFile,
+              {},
+              node,
+              'Convert export',
+              'Convert default export to named export'
+            );
+          edits?.applyChanges();
+        }
+      });
 
-type Config = {
-  projectFiles: string;
-  start: string;
-};
+      sourceFile.getDescendantsOfKind(SyntaxKind.ExportDeclaration).forEach((exportDeclaration) => {
+        exportDeclaration.remove();
+      });
+    }
+  }
 
-type PathWithExports = Record<string, string>;
-
-const handleDefaultExportUsage = (
-  node: Node,
-  currentFilePath: string,
-  tsConfigOptions: CompilerOptions,
-  pathsWithExports: PathWithExports,
-  fixedInFile: string[]
-) => {
-  if (Node.isExportDeclaration(node)) {
-    const moduleSpecifier = node.getModuleSpecifier();
-    if (moduleSpecifier) {
-      const resolvedFileName = getResolvedFileName(
-        moduleSpecifier,
-        currentFilePath,
-        tsConfigOptions
-      );
-
-      if (resolvedFileName) {
-        const exportedNames = pathsWithExports[resolvedFileName];
-
-        if (exportedNames) {
-          for (const resolvedFileNameElement of node.getNamedExports()) {
-            if (Node.isExportSpecifier(resolvedFileNameElement)) {
-              const name = resolvedFileNameElement.getName();
-              const alias = resolvedFileNameElement.getAliasNode()?.getText();
-              const exportedName = exportedNames;
-
-              if (alias) {
-                resolvedFileNameElement.setName(exportedName);
-                resolvedFileNameElement.removeAliasWithRename();
-              }
-              if (!alias && name === 'default') {
-                resolvedFileNameElement.setName(exportedName);
-                pathsWithExports[currentFilePath] = exportedName;
+  for (const sourceFile of sourceFiles) {
+    sourceFile.getDescendantsOfKind(SyntaxKind.ExportSpecifier).forEach((namedExports) => {
+      const name = namedExports.getName();
+      const alias = namedExports.getAliasNode()?.getText();
+      if (alias === 'default') {
+        namedExports
+          .getNameNode()
+          .findReferencesAsNodes()
+          .forEach((node) => {
+            if (node.getSourceFile().getFilePath() !== sourceFile.getFilePath()) {
+              const parent = node.getParent();
+              if (Node.isImportClause(parent)) {
+                const namedImportsNames = parent
+                  .getNamedImports()
+                  .map((namedImport) => namedImport.getName());
+                const namedImports = [...namedImportsNames, name].map((name) => {
+                  return { name };
+                });
+                parent.getParent().renameDefaultImport(name);
+                parent.getParent().set({
+                  defaultImport: undefined,
+                  namedImports,
+                });
+              } else if (Node.isExportSpecifier(parent)) {
+                parent.setName(name);
               }
             }
+          });
+      }
+    });
+  }
+
+  for (const sourceFile of sourceFiles) {
+    sourceFile.getDescendantsOfKind(SyntaxKind.ExportSpecifier).forEach((exportSpecifier) => {
+      exportSpecifier.removeAliasWithRename();
+    });
+
+    sourceFile.getDescendantsOfKind(SyntaxKind.ImportDeclaration).forEach((importDeclaration) => {
+      const importDeclarationPath = importDeclaration.getModuleSpecifierSourceFile()?.getFilePath();
+      if (!importDeclarationPath?.includes('node_modules')) {
+        for (const namedImports of importDeclaration.getNamedImports()) {
+          if (Node.isImportSpecifier(namedImports)) {
+            namedImports.removeAliasWithRename();
           }
         }
       }
-    }
-  }
-
-  if (Node.isImportDeclaration(node)) {
-    const namedImports = node.getNamedImports();
-    const importClauseSymbol = node.getImportClause()?.getSymbol();
-    const namedImportsNames = namedImports.map((namedImport) => namedImport.getName());
-
-    const moduleSpecifier = node.getModuleSpecifier();
-    const resolvedFileName = getResolvedFileName(moduleSpecifier, currentFilePath, tsConfigOptions);
-
-    if (resolvedFileName) {
-      // TODO: find better way to fix path
-      const fixedPath = resolvedFileName.includes(cwd)
-        ? resolvedFileName
-        : path.join(cwd, resolvedFileName);
-      const exportedName = pathsWithExports[fixedPath];
-      if (importClauseSymbol && exportedName && !fixedInFile.includes(fixedPath)) {
-        node.renameDefaultImport(exportedName);
-        replaceDefaultImportToNamedImport(node, [...namedImportsNames, exportedName]);
-        fixedInFile.push(fixedPath);
-      }
-    }
-  }
-};
-
-export const migrateToNamedExport = (config: Config) => {
-  const project = new Project({
-    tsConfigFilePath: 'tsconfig.json',
-    // skipAddingFilesFromTsConfig: true,
-    // skipFileDependencyResolution: true,
-  });
-
-  const sourceFiles = project.getSourceFiles(config.projectFiles);
-  const sourceFilesMap = getSourceFilesMap(sourceFiles);
-  const tsConfig = getTsConfig();
-  const dependencyGraph = getDependencyGraph(config);
-
-  if (tsConfig) {
-    const pathsWithExports: PathWithExports = {};
-    const graphNodesPath = dependencyGraph.nodes.map((node) => path.join(cwd, node.path));
-    for (const nodePath of graphNodesPath.reverse()) {
-      const sourceFile = sourceFilesMap[nodePath];
-      const currentFilePath = sourceFile.getFilePath();
-
-      // TODO: move to single forEachDescendant to improve performance
-      // TODO: use ts-morph renaming https://github.com/microsoft/TypeScript/pull/24878
-      // TODO: use getDescendantsOfKind
-      const defaultExportName = getDefaultExportName(sourceFile);
-      if (defaultExportName) {
-        sourceFile.forEachDescendant((node) => {
-          setIsExportedByDefaultName(node, defaultExportName);
-          pathsWithExports[currentFilePath] = defaultExportName;
-        });
-      }
-
-      // to support mixed imports of same file on next lines
-      const fixedInFile: string[] = [];
-      sourceFile.forEachDescendant((node) => {
-        handleDefaultExportUsage(
-          node,
-          currentFilePath,
-          tsConfig.options,
-          pathsWithExports,
-          fixedInFile
-        );
-      });
-    }
-
-    // handle files outside of graph
-    for (const sourceFile of sourceFiles) {
-      const sourceFilePath = sourceFile.getFilePath();
-      if (!graphNodesPath.includes(sourceFilePath)) {
-        const currentFilePath = sourceFilePath;
-        const fixedInFile: string[] = [];
-        sourceFile.forEachDescendant((node) => {
-          handleDefaultExportUsage(
-            node,
-            currentFilePath,
-            tsConfig.options,
-            pathsWithExports,
-            fixedInFile
-          );
-        });
-      }
-    }
+    });
   }
 
   return project.save();
 };
 
-// migrateToNamedExport({
-//   projectFiles: 'test/test-project/**/*.ts',
-//   start: 'test/test-project/A-usage.ts',
-// });
+// migrateToNamedExport('test/test-project/**/*.ts');
 
-migrateToNamedExport({
-  projectFiles: '**/*.{tsx,ts,js}',
-  start: 'src/pages/balance/index.page.tsx',
-});
+// migrateToNamedExport('**/{src,test}/**/*.{tsx,ts,js}');
