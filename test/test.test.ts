@@ -1,14 +1,14 @@
 import fs from 'fs';
+
+import { beforeAll, describe, it, expect } from 'vitest'
+
 import { migrateToNamedExport } from '../src';
 
 import { prepareTestCases } from './helper';
 // fs.cpSync('example', 'example-untouched', {recursive: true});
 
 beforeAll(async () => {
-  await migrateToNamedExport({
-    projectFiles: 'test/test-project/**/*.ts',
-    start: 'test/test-project/A-usage.ts',
-  });
+  await migrateToNamedExport('test/test-project/**/*.ts');
 });
 
 describe('default-export', () => {
