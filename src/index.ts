@@ -1,4 +1,5 @@
 import { Node, Project, SourceFile, SyntaxKind } from 'ts-morph';
+import cliProgress from 'cli-progress';
 
 const getDefaultExportName = (sourceFile: SourceFile) => {
   const defaultExportSymbol = sourceFile.getDefaultExportSymbol();
@@ -40,7 +41,11 @@ export const migrateToNamedExport = (projectFiles: string) => {
     (sourceFile) => !sourceFile.getFilePath().includes('.page.ts')
   );
 
-  for (const sourceFile of sourceFilesWithoutPages) {
+  console.log('Convert default export to named export');
+  const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+  bar1.start(sourceFilesWithoutPages.length - 1, 0);
+
+  sourceFilesWithoutPages.forEach((sourceFile, index) => {
     const defaultExportName = getDefaultExportName(sourceFile);
 
     if (defaultExportName) {
@@ -65,9 +70,15 @@ export const migrateToNamedExport = (projectFiles: string) => {
         exportDeclaration.remove();
       });
     }
-  }
+    bar1.update(index);
+  });
+  bar1.stop();
 
-  for (const sourceFile of sourceFiles) {
+  console.log('Post process usage from index.ts');
+  const bar2 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+  bar2.start(sourceFiles.length - 1, 0);
+
+  sourceFiles.forEach((sourceFile, index) => {
     sourceFile.getDescendantsOfKind(SyntaxKind.ExportSpecifier).forEach((namedExports) => {
       const name = namedExports.getName();
       const alias = namedExports.getAliasNode()?.getText();
@@ -97,9 +108,15 @@ export const migrateToNamedExport = (projectFiles: string) => {
           });
       }
     });
-  }
+    bar2.update(index);
+  });
+  bar2.stop();
 
-  for (const sourceFile of sourceFiles) {
+  console.log('Remove aliases with rename');
+  const bar3 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+  bar3.start(sourceFiles.length - 1, 0);
+
+  sourceFiles.forEach((sourceFile, index) => {
     sourceFile.getDescendantsOfKind(SyntaxKind.ExportSpecifier).forEach((exportSpecifier) => {
       exportSpecifier.removeAliasWithRename();
     });
@@ -114,7 +131,9 @@ export const migrateToNamedExport = (projectFiles: string) => {
         }
       }
     });
-  }
+    bar3.update(index);
+  });
+  bar3.stop();
 
   return project.save();
 };

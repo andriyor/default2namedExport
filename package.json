@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/cli-progress": "^3.11.0",
+    "cli-progress": "^3.12.0",
     "ts_dependency_graph": "^2.0.0",
     "ts-morph": "^18.0.0",
     "typescript": "^5.0.4"
