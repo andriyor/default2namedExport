@@ -13,7 +13,6 @@
 - [x] handle mixed imports `import COmponent, { Props } from './component';`
 - [ ] run as CLI
 - [ ] add mixed import test
-- [ ] add renamed Button import test
 - [ ] lazy import
 - [ ] save previous imports with alias
 - [ ] progress bar and stats
