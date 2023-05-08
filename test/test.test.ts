@@ -8,7 +8,9 @@ import { prepareTestCases } from './helper';
 // fs.cpSync('example', 'example-untouched', {recursive: true});
 
 beforeAll(async () => {
-  await migrateToNamedExport('test/test-project/**/*.ts');
+  await migrateToNamedExport({
+    projectFiles: 'test/test-project/**/*.ts'
+  });
 });
 
 describe('default-export', () => {
