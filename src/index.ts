@@ -71,7 +71,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
     tsConfigFilePath: 'tsconfig.json',
   });
   const tsConfig = getTsConfig();
-  const processedFiles: string[] = [];
+  const fileExport: Record<string, string> = {};
 
   if (tsConfig) {
     const sourceFiles = project.getSourceFiles(
@@ -111,8 +111,9 @@ export const migrateToNamedExport = (projectFiles: Config) => {
           .forEach((exportDeclaration) => {
             exportDeclaration.remove();
           });
+
+        fileExport[sourceFile.getFilePath()] = defaultExportName;
       }
-      processedFiles.push(sourceFile.getFilePath());
       bar1.update(index);
     });
     bar1.stop();
@@ -147,10 +148,10 @@ export const migrateToNamedExport = (projectFiles: Config) => {
                     defaultImport: undefined,
                     namedImports,
                   });
-                  processedFiles.push(currentFilePath);
+                  fileExport[currentFilePath] = name;
                 } else if (Node.isExportSpecifier(parent)) {
                   parent.setName(name);
-                  processedFiles.push(currentFilePath);
+                  fileExport[currentFilePath] = name;
                 }
               }
             });
@@ -174,7 +175,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
             currentFilePath,
             tsConfig.options
           );
-          if (resolvedFileName && processedFiles.includes(resolvedFileName)) {
+          if (resolvedFileName && Object.keys(fileExport).includes(resolvedFileName)) {
             exportDeclaration.getNamedExports().forEach((exportSpecifier) => {
               exportSpecifier.removeAliasWithRename();
             });
@@ -195,7 +196,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
                 currentFilePath,
                 tsConfig.options
               );
-              if (resolvedFileName && processedFiles.includes(resolvedFileName)) {
+              if (resolvedFileName && Object.keys(fileExport).includes(resolvedFileName)) {
                 namedImports.removeAliasWithRename();
               }
             }
@@ -206,11 +207,53 @@ export const migrateToNamedExport = (projectFiles: Config) => {
     });
     bar3.stop();
 
+    console.log('Handle jest.mock default');
+    const bar4 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar4.start(projectSourceFiles.length - 1, 0);
+
+    projectSourceFiles.forEach((sourceFile, index) => {
+      const currentFilePath = sourceFile.getFilePath();
+      sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
+        const expression = callExpression.getExpression();
+        if (Node.isPropertyAccessExpression(expression)) {
+          const propExpression = expression.getExpression();
+          if (Node.isIdentifier(propExpression)) {
+            const expressionName = expression.getName();
+            const propExpressionText = propExpression.getText();
+            if (propExpressionText === 'jest' && expressionName === 'mock') {
+              const firstArg = callExpression.getArguments()[0];
+              if (Node.isStringLiteral(firstArg)) {
+                const resolvedFileName = getResolvedFileName(
+                  firstArg,
+                  currentFilePath,
+                  tsConfig.options
+                );
+                if (resolvedFileName && fileExport[resolvedFileName]) {
+                  callExpression
+                    .getDescendantsOfKind(SyntaxKind.PropertyAssignment)
+                    .forEach((propertyAssignment) => {
+                      const name = propertyAssignment.getName();
+                      if (name === 'default') {
+                        propertyAssignment.rename(fileExport[resolvedFileName]);
+                      }
+                    });
+                }
+              }
+            }
+          }
+        }
+      });
+      bar4.update(index);
+    });
+    bar4.stop();
+
     return project.save();
   }
 };
 
-// migrateToNamedExport('test/test-project/**/*.ts');
+// migrateToNamedExport({
+//   projectFiles: 'test/test-project/**/*.ts',
+// });
 
 migrateToNamedExport({
   projectFiles: '{src,test}/**/*.{tsx,ts,js}',
