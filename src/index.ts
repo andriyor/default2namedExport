@@ -257,5 +257,5 @@ export const migrateToNamedExport = (projectFiles: Config) => {
 
 migrateToNamedExport({
   projectFiles: '{src,test}/**/*.{tsx,ts,js}',
-  workOn: 'src/components/pay-links/**/*.{tsx,ts,js}',
-});
+  workOn: 'src/components/form/**/*.{tsx,ts,js}',
+})
