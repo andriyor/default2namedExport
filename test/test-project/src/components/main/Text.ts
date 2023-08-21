@@ -2,4 +2,4 @@ const TextComponent = () => {
   return 'Text';
 };
 
-export default Text;
+export default TextComponent;
