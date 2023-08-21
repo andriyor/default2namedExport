@@ -1,11 +1,6 @@
-import {
-  CompilerOptions,
-  Node,
-  Project,
-  SourceFile,
-  SyntaxKind,
-  ts,
-} from 'ts-morph';
+import path from 'path';
+
+import { CompilerOptions, Node, Project, SourceFile, SyntaxKind, ts } from 'ts-morph';
 import cliProgress from 'cli-progress';
 
 type Config = {
@@ -61,7 +56,11 @@ const getResolvedFileName = (
   tsOptions: CompilerOptions
 ) => {
   const resolvedModuleName = ts.resolveModuleName(moduleName, containingFile, tsOptions, ts.sys);
-  return resolvedModuleName.resolvedModule?.resolvedFileName;
+  if (resolvedModuleName.resolvedModule?.resolvedFileName.includes(process.cwd())) {
+    return resolvedModuleName.resolvedModule?.resolvedFileName;
+  } else {
+    return path.join(process.cwd(), resolvedModuleName.resolvedModule?.resolvedFileName || '');
+  }
 };
 
 export const migrateToNamedExport = (projectFiles: Config) => {
@@ -71,6 +70,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
   const tsConfig = getTsConfig();
 
   if (tsConfig) {
+    const projectSourceFiles = project.getSourceFiles(projectFiles.projectFiles);
     const sourceFiles = project.getSourceFiles(
       projectFiles.workOn ? projectFiles.workOn : projectFiles.projectFiles
     );
@@ -85,7 +85,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
     const bar0 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
     bar0.start(sourceFilesWithoutPages.length - 1, 0);
 
-    sourceFilesWithoutPages.forEach((sourceFile, index) => {
+    projectSourceFiles.forEach((sourceFile, index) => {
       const currentFilePath = sourceFile.getFilePath();
       sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
         const expression = callExpression.getExpression();
@@ -153,8 +153,6 @@ export const migrateToNamedExport = (projectFiles: Config) => {
       bar1.update(index);
     });
     bar1.stop();
-
-    const projectSourceFiles = project.getSourceFiles(projectFiles.projectFiles);
 
     console.log('Post process usage from index.ts');
     const bar2 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
