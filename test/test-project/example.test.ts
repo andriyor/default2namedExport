@@ -4,3 +4,7 @@ jest.mock('./src/components/main/Input', () => {
     default: () => '',
   };
 });
+
+jest.mock('./src/components/main/Input', () => {
+  return () => '';
+});

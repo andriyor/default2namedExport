@@ -6,5 +6,5 @@ jest.mock('./src/components/main/Input', () => {
 });
 
 jest.mock('./src/components/main/Input', () => {
-  return { Input: () => '' }
+  return { Input: () => '' };
 });
