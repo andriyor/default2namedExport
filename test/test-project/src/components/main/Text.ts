@@ -1,5 +1,5 @@
 const TextComponent = () => {
-  return  'Text';
-}
+  return 'Text';
+};
 
 export default Text;
