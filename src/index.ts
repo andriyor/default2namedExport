@@ -3,7 +3,6 @@ import {
   Node,
   Project,
   SourceFile,
-  StringLiteral,
   SyntaxKind,
   ts,
 } from 'ts-morph';
@@ -57,11 +56,10 @@ const setIsExportedByDefaultName = (node: Node, defaultExportName: string) => {
 };
 
 const getResolvedFileName = (
-  moduleSpecifier: StringLiteral,
+  moduleName: string,
   containingFile: string,
   tsOptions: CompilerOptions
 ) => {
-  const moduleName = trimQuotes(moduleSpecifier.getText());
   const resolvedModuleName = ts.resolveModuleName(moduleName, containingFile, tsOptions, ts.sys);
   return resolvedModuleName.resolvedModule?.resolvedFileName;
 };
@@ -71,7 +69,6 @@ export const migrateToNamedExport = (projectFiles: Config) => {
     tsConfigFilePath: 'tsconfig.json',
   });
   const tsConfig = getTsConfig();
-  const fileExport: Record<string, string> = {};
 
   if (tsConfig) {
     const sourceFiles = project.getSourceFiles(
@@ -81,14 +78,53 @@ export const migrateToNamedExport = (projectFiles: Config) => {
       (sourceFile) => !sourceFile.getFilePath().includes('.page.ts')
     );
 
+    const fileExport: Record<string, string> = {};
+    const lazyPaths: string[] = [];
+
+    console.log('Detect lazy imports');
+    const bar0 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar0.start(sourceFilesWithoutPages.length - 1, 0);
+
+    sourceFilesWithoutPages.forEach((sourceFile, index) => {
+      const currentFilePath = sourceFile.getFilePath();
+      sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
+        const expression = callExpression.getExpression();
+        if (Node.isIdentifier(expression)) {
+          const expressionText = expression.getText();
+          if (expressionText === 'lazy') {
+            callExpression
+              .getDescendantsOfKind(SyntaxKind.CallExpression)
+              .forEach((nestedCallExpression) => {
+                nestedCallExpression.getArguments().forEach((argument) => {
+                  if (Node.isStringLiteral(argument)) {
+                    const moduleName = trimQuotes(argument.getText());
+                    const resolvedFileName = getResolvedFileName(
+                      moduleName,
+                      currentFilePath,
+                      tsConfig.options
+                    );
+                    if (resolvedFileName) {
+                      lazyPaths.push(resolvedFileName);
+                    }
+                  }
+                });
+              });
+          }
+        }
+      });
+      bar0.update(index);
+    });
+    bar0.stop();
+
     console.log('Convert default export to named export');
     const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
     bar1.start(sourceFilesWithoutPages.length - 1, 0);
 
     sourceFilesWithoutPages.forEach((sourceFile, index) => {
       const defaultExportName = getDefaultExportName(sourceFile);
+      const filePath = sourceFile.getFilePath();
 
-      if (defaultExportName) {
+      if (defaultExportName && !lazyPaths.includes(filePath)) {
         sourceFile.forEachDescendant((node) => {
           setIsExportedByDefaultName(node, defaultExportName);
 
@@ -112,7 +148,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
             exportDeclaration.remove();
           });
 
-        fileExport[sourceFile.getFilePath()] = defaultExportName;
+        fileExport[filePath] = defaultExportName;
       }
       bar1.update(index);
     });
@@ -170,8 +206,9 @@ export const migrateToNamedExport = (projectFiles: Config) => {
       sourceFile.getDescendantsOfKind(SyntaxKind.ExportDeclaration).forEach((exportDeclaration) => {
         const moduleSpecifier = exportDeclaration.getModuleSpecifier();
         if (moduleSpecifier) {
+          const moduleName = trimQuotes(moduleSpecifier.getText());
           const resolvedFileName = getResolvedFileName(
-            moduleSpecifier,
+            moduleName,
             currentFilePath,
             tsConfig.options
           );
@@ -191,8 +228,9 @@ export const migrateToNamedExport = (projectFiles: Config) => {
           for (const namedImports of importDeclaration.getNamedImports()) {
             if (Node.isImportSpecifier(namedImports)) {
               const moduleSpecifier = importDeclaration.getModuleSpecifier();
+              const moduleName = trimQuotes(moduleSpecifier.getText());
               const resolvedFileName = getResolvedFileName(
-                moduleSpecifier,
+                moduleName,
                 currentFilePath,
                 tsConfig.options
               );
@@ -224,13 +262,13 @@ export const migrateToNamedExport = (projectFiles: Config) => {
               const firstArg = callExpression.getArguments()[0];
 
               if (Node.isStringLiteral(firstArg)) {
+                const moduleName = trimQuotes(firstArg.getText());
                 const resolvedFileName = getResolvedFileName(
-                  firstArg,
+                  moduleName,
                   currentFilePath,
                   tsConfig.options
                 );
                 if (resolvedFileName && fileExport[resolvedFileName]) {
-
                   callExpression
                     .getDescendantsOfKind(SyntaxKind.PropertyAssignment)
                     .forEach((propertyAssignment) => {
@@ -241,13 +279,15 @@ export const migrateToNamedExport = (projectFiles: Config) => {
                     });
 
                   callExpression
-                      .getDescendantsOfKind(SyntaxKind.ReturnStatement).forEach(returnStatement => {
-                    const expression = returnStatement.getExpression();
-                    if(Node.isArrowFunction(expression)) {
-                      expression.replaceWithText(`{ ${fileExport[resolvedFileName]}: ${expression.getText()} }`)
-                    }
-                  })
-
+                    .getDescendantsOfKind(SyntaxKind.ReturnStatement)
+                    .forEach((returnStatement) => {
+                      const expression = returnStatement.getExpression();
+                      if (Node.isArrowFunction(expression)) {
+                        expression.replaceWithText(
+                          `{ ${fileExport[resolvedFileName]}: ${expression.getText()} }`
+                        );
+                      }
+                    });
                 }
               }
             }
@@ -262,11 +302,11 @@ export const migrateToNamedExport = (projectFiles: Config) => {
   }
 };
 
-// migrateToNamedExport({
-//   projectFiles: 'test/test-project/**/*.ts',
-// });
-
 migrateToNamedExport({
-  projectFiles: '{src,test}/**/*.{tsx,ts,js}',
-  workOn: 'src/components/form/**/*.{tsx,ts,js}',
-})
+  projectFiles: 'test/test-project/**/*.{tsx,ts,js}',
+});
+
+// migrateToNamedExport({
+//   projectFiles: '{src,test}/**/*.{tsx,ts,js}',
+//   workOn: 'src/components/form/**/*.{tsx,ts,js}',
+// })
