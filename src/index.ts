@@ -222,6 +222,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
             const propExpressionText = propExpression.getText();
             if (propExpressionText === 'jest' && expressionName === 'mock') {
               const firstArg = callExpression.getArguments()[0];
+
               if (Node.isStringLiteral(firstArg)) {
                 const resolvedFileName = getResolvedFileName(
                   firstArg,
@@ -229,6 +230,7 @@ export const migrateToNamedExport = (projectFiles: Config) => {
                   tsConfig.options
                 );
                 if (resolvedFileName && fileExport[resolvedFileName]) {
+
                   callExpression
                     .getDescendantsOfKind(SyntaxKind.PropertyAssignment)
                     .forEach((propertyAssignment) => {
@@ -237,6 +239,15 @@ export const migrateToNamedExport = (projectFiles: Config) => {
                         propertyAssignment.rename(fileExport[resolvedFileName]);
                       }
                     });
+
+                  callExpression
+                      .getDescendantsOfKind(SyntaxKind.ReturnStatement).forEach(returnStatement => {
+                    const expression = returnStatement.getExpression();
+                    if(Node.isArrowFunction(expression)) {
+                      expression.replaceWithText(`{ ${fileExport[resolvedFileName]}: ${expression.getText()} }`)
+                    }
+                  })
+
                 }
               }
             }
