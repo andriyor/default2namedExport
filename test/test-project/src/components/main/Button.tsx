@@ -1,5 +1,5 @@
 import React from 'react';
-import { helper } from '../../helper/helper';
+import helper from '../../helper/helper';
 
 const Button = () => {
   helper();
