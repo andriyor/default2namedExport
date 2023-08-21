@@ -1,6 +1,7 @@
+import React from 'react';
 import { helper } from '../../helper/helper';
 
 export const Button = () => {
   helper();
-  return  'button';
-}
+  return <div>Button</div>;
+};

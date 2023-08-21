@@ -9,7 +9,7 @@ import { prepareTestCases } from './helper';
 
 beforeAll(async () => {
   await migrateToNamedExport({
-    projectFiles: 'test/test-project/**/*.ts'
+    projectFiles: 'test/test-project/**/*.{tsx,ts}'
   });
 });
 
