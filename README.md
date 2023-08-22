@@ -10,7 +10,7 @@
 - [x] Partial migrate by glob pattern
 - [x] Handle jest.mock with default property
 - [x] Handle jest.mock without default property
-- [x] Handle lazy import
+- [x] Handle lazy/dynamic import
 - [x] Ignore files which will be required
 - [x] Run as CLI
 - [ ] Run "Convert 'require' to 'import'"
