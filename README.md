@@ -15,6 +15,7 @@
 - [X] Run as CLI
 - [ ] Run "Convert 'require' to 'import'"
 - [ ] Save previous imports with alias
+- [ ] Publish npm package
 
 ## CLI
 
