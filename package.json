@@ -11,18 +11,17 @@
   "license": "ISC",
   "dependencies": {
     "cli-progress": "^3.12.0",
-    "ts-morph": "^18.0.0"
+    "ts-morph": "^19.0.0"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.0",
-    "@types/jest": "^29.5.1",
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.58.0",
     "@typescript-eslint/parser": "^5.58.0",
-    "eslint": "^8.38.0",
-    "glob": "^10.1.0",
-    "prettier": "^2.8.7",
-    "typescript": "^5.0.4",
-    "vitest": "^0.31.0"
+    "eslint": "^8.47.0",
+    "glob": "^10.3.3",
+    "prettier": "^3.0.2",
+    "typescript": "^5.1.6",
+    "vitest": "^0.34.2"
   }
 }
