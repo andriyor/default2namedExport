@@ -1,7 +1,7 @@
 import React, { lazy } from 'react';
 
 export const Video = () => {
-  const PaymentToolsReasons = lazy(() => import('./Button'));
+  const PaymentToolsReasons = lazy(() => import('./LazyButton'));
 
   return <PaymentToolsReasons />;
 };

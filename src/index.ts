@@ -97,7 +97,7 @@ const findLazy = (sourceFile: SourceFile, compilerOptions: CompilerOptions) => {
     const expression = callExpression.getExpression();
     if (Node.isIdentifier(expression)) {
       const expressionText = expression.getText();
-      if (expressionText === 'lazy') {
+      if (['dynamic', 'lazy'].includes(expressionText)) {
         callExpression
           .getDescendantsOfKind(SyntaxKind.CallExpression)
           .forEach((nestedCallExpression) => {
