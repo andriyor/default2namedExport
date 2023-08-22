@@ -11,5 +11,7 @@
 - [x] Handle jest.mock with default property
 - [x] Handle jest.mock without default property
 - [x] Handle lazy import
+- [x] Ignore files which will be required
+- [ ] Run "Convert 'require' to 'import'"
 - [ ] Run as CLI
 - [ ] Save previous imports with alias

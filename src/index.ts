@@ -56,11 +56,66 @@ const getResolvedFileName = (
   tsOptions: CompilerOptions
 ) => {
   const resolvedModuleName = ts.resolveModuleName(moduleName, containingFile, tsOptions, ts.sys);
-  if (resolvedModuleName.resolvedModule?.resolvedFileName.includes(process.cwd())) {
-    return resolvedModuleName.resolvedModule?.resolvedFileName;
-  } else {
-    return path.join(process.cwd(), resolvedModuleName.resolvedModule?.resolvedFileName || '');
+  if (resolvedModuleName.resolvedModule?.resolvedFileName) {
+    if (resolvedModuleName.resolvedModule.resolvedFileName.includes(process.cwd())) {
+      return resolvedModuleName.resolvedModule?.resolvedFileName;
+    } else {
+      return path.join(process.cwd(), resolvedModuleName.resolvedModule.resolvedFileName);
+    }
   }
+};
+
+const findRequire = (sourceFile: SourceFile, compilerOptions: CompilerOptions) => {
+  const requirePaths: string[] = [];
+  const currentFilePath = sourceFile.getFilePath();
+  sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
+    const expression = callExpression.getExpression();
+    if (Node.isIdentifier(expression)) {
+      const expressionText = expression.getText();
+      if (expressionText === 'require') {
+        const firstArgument = callExpression.getArguments()[0];
+        if (Node.isStringLiteral(firstArgument)) {
+          const moduleName = trimQuotes(firstArgument.getText());
+          const filePath = getResolvedFileName(moduleName, currentFilePath, compilerOptions);
+          if (filePath) {
+            requirePaths.push(filePath);
+          }
+        }
+      }
+    }
+  });
+  return requirePaths;
+};
+
+const findLazy = (sourceFile: SourceFile, compilerOptions: CompilerOptions) => {
+  const lazyPaths: string[] = [];
+  const currentFilePath = sourceFile.getFilePath();
+  sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
+    const expression = callExpression.getExpression();
+    if (Node.isIdentifier(expression)) {
+      const expressionText = expression.getText();
+      if (expressionText === 'lazy') {
+        callExpression
+          .getDescendantsOfKind(SyntaxKind.CallExpression)
+          .forEach((nestedCallExpression) => {
+            nestedCallExpression.getArguments().forEach((argument) => {
+              if (Node.isStringLiteral(argument)) {
+                const moduleName = trimQuotes(argument.getText());
+                const resolvedFileName = getResolvedFileName(
+                  moduleName,
+                  currentFilePath,
+                  compilerOptions
+                );
+                if (resolvedFileName) {
+                  lazyPaths.push(resolvedFileName);
+                }
+              }
+            });
+          });
+      }
+    }
+  });
+  return lazyPaths;
 };
 
 export const migrateToNamedExport = (projectFiles: Config) => {
@@ -85,27 +140,8 @@ export const migrateToNamedExport = (projectFiles: Config) => {
     const requirePaths: string[] = [];
 
     projectSourceFiles.forEach((sourceFile, index) => {
-      const currentFilePath = sourceFile.getFilePath();
-      sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
-        const expression = callExpression.getExpression();
-        if (Node.isIdentifier(expression)) {
-          const expressionText = expression.getText();
-          if (expressionText === 'require') {
-            const firstArgument = callExpression.getArguments()[0];
-            if (Node.isStringLiteral(firstArgument)) {
-              const moduleName = trimQuotes(firstArgument.getText());
-              const resolvedFileName = getResolvedFileName(
-                moduleName,
-                currentFilePath,
-                tsConfig.options
-              );
-              if (resolvedFileName) {
-                requirePaths.push(resolvedFileName);
-              }
-            }
-          }
-        }
-      });
+      const requiresInFile = findRequire(sourceFile, tsConfig.options);
+      requirePaths.push(...requiresInFile);
       bar0.update(index);
     });
     bar0.stop();
@@ -117,32 +153,8 @@ export const migrateToNamedExport = (projectFiles: Config) => {
     const lazyPaths: string[] = [];
 
     projectSourceFiles.forEach((sourceFile, index) => {
-      const currentFilePath = sourceFile.getFilePath();
-      sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
-        const expression = callExpression.getExpression();
-        if (Node.isIdentifier(expression)) {
-          const expressionText = expression.getText();
-          if (expressionText === 'lazy') {
-            callExpression
-              .getDescendantsOfKind(SyntaxKind.CallExpression)
-              .forEach((nestedCallExpression) => {
-                nestedCallExpression.getArguments().forEach((argument) => {
-                  if (Node.isStringLiteral(argument)) {
-                    const moduleName = trimQuotes(argument.getText());
-                    const resolvedFileName = getResolvedFileName(
-                      moduleName,
-                      currentFilePath,
-                      tsConfig.options
-                    );
-                    if (resolvedFileName) {
-                      lazyPaths.push(resolvedFileName);
-                    }
-                  }
-                });
-              });
-          }
-        }
-      });
+      const lazyInFile = findLazy(sourceFile, tsConfig.options);
+      lazyPaths.push(...lazyInFile);
       bar1.update(index);
     });
     bar1.stop();
