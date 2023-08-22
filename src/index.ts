@@ -3,6 +3,9 @@ import path from 'path';
 import { CompilerOptions, Node, Project, SourceFile, SyntaxKind, ts } from 'ts-morph';
 import cliProgress from 'cli-progress';
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-var-requires,@typescript-eslint/no-unsafe-assignment
+const argv: Config = require("yargs-parser")(process.argv.slice(2));
+
 type Config = {
   projectFiles: string;
   workOn?: string;
@@ -345,9 +348,12 @@ export const migrateToNamedExport = (projectFiles: Config) => {
   }
 };
 
-migrateToNamedExport({
-  projectFiles: 'test/test-project/**/*.{tsx,ts,js}',
-});
+if (argv.projectFiles) {
+  migrateToNamedExport({
+    projectFiles: argv.projectFiles,
+    workOn: argv?.workOn || ''
+  });
+}
 
 // migrateToNamedExport({
 //   projectFiles: '{src,test}/**/*.{tsx,ts,js}',

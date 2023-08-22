@@ -12,6 +12,25 @@
 - [x] Handle jest.mock without default property
 - [x] Handle lazy import
 - [x] Ignore files which will be required
+- [X] Run as CLI
 - [ ] Run "Convert 'require' to 'import'"
-- [ ] Run as CLI
 - [ ] Save previous imports with alias
+
+## CLI
+
+```shell
+npx tsx src/index.ts --project-files='{src,test}/**/*.{tsx,ts,js}' --work-on='src/components/form/**/*.{tsx,ts,js}'
+```
+
+## API
+
+
+```ts
+import { migrateToNamedExport } from '../src';
+
+migrateToNamedExport({
+  projectFiles: '{src,test}/**/*.{tsx,ts,js}',
+  workOn: 'src/components/form/**/*.{tsx,ts,js}',
+})
+```
+

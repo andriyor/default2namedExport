@@ -11,7 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "cli-progress": "^3.12.0",
-    "ts-morph": "^19.0.0"
+    "ts-morph": "^19.0.0",
+    "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.0",
