@@ -78,12 +78,43 @@ export const migrateToNamedExport = (projectFiles: Config) => {
       (sourceFile) => !sourceFile.getFilePath().includes('.page.ts')
     );
 
-    const fileExport: Record<string, string> = {};
-    const lazyPaths: string[] = [];
+    console.log('Detect require imports');
+    const bar0 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar0.start(projectSourceFiles.length - 1, 0);
+
+    const requirePaths: string[] = [];
+
+    projectSourceFiles.forEach((sourceFile, index) => {
+      const currentFilePath = sourceFile.getFilePath();
+      sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((callExpression) => {
+        const expression = callExpression.getExpression();
+        if (Node.isIdentifier(expression)) {
+          const expressionText = expression.getText();
+          if (expressionText === 'require') {
+            const firstArgument = callExpression.getArguments()[0];
+            if (Node.isStringLiteral(firstArgument)) {
+              const moduleName = trimQuotes(firstArgument.getText());
+              const resolvedFileName = getResolvedFileName(
+                moduleName,
+                currentFilePath,
+                tsConfig.options
+              );
+              if (resolvedFileName) {
+                requirePaths.push(resolvedFileName);
+              }
+            }
+          }
+        }
+      });
+      bar0.update(index);
+    });
+    bar0.stop();
 
     console.log('Detect lazy imports');
-    const bar0 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar0.start(sourceFilesWithoutPages.length - 1, 0);
+    const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar1.start(projectSourceFiles.length - 1, 0);
+
+    const lazyPaths: string[] = [];
 
     projectSourceFiles.forEach((sourceFile, index) => {
       const currentFilePath = sourceFile.getFilePath();
@@ -112,19 +143,21 @@ export const migrateToNamedExport = (projectFiles: Config) => {
           }
         }
       });
-      bar0.update(index);
+      bar1.update(index);
     });
-    bar0.stop();
+    bar1.stop();
 
     console.log('Convert default export to named export');
-    const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar1.start(sourceFilesWithoutPages.length - 1, 0);
+    const bar2 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar2.start(sourceFilesWithoutPages.length - 1, 0);
+
+    const fileExport: Record<string, string> = {};
 
     sourceFilesWithoutPages.forEach((sourceFile, index) => {
       const defaultExportName = getDefaultExportName(sourceFile);
       const filePath = sourceFile.getFilePath();
 
-      if (defaultExportName && !lazyPaths.includes(filePath)) {
+      if (defaultExportName && !lazyPaths.includes(filePath) && !requirePaths.includes(filePath)) {
         sourceFile.forEachDescendant((node) => {
           setIsExportedByDefaultName(node, defaultExportName);
 
@@ -150,13 +183,13 @@ export const migrateToNamedExport = (projectFiles: Config) => {
 
         fileExport[filePath] = defaultExportName;
       }
-      bar1.update(index);
+      bar2.update(index);
     });
-    bar1.stop();
+    bar2.stop();
 
     console.log('Post process usage from index.ts');
-    const bar2 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar2.start(projectSourceFiles.length - 1, 0);
+    const bar3 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar3.start(projectSourceFiles.length - 1, 0);
 
     projectSourceFiles.forEach((sourceFile, index) => {
       const currentFilePath = sourceFile.getFilePath();
@@ -191,13 +224,13 @@ export const migrateToNamedExport = (projectFiles: Config) => {
             });
         }
       });
-      bar2.update(index);
+      bar3.update(index);
     });
-    bar2.stop();
+    bar3.stop();
 
     console.log('Remove aliases with rename');
-    const bar3 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar3.start(projectSourceFiles.length - 1, 0);
+    const bar4 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar4.start(projectSourceFiles.length - 1, 0);
 
     projectSourceFiles.forEach((sourceFile, index) => {
       const currentFilePath = sourceFile.getFilePath();
@@ -239,13 +272,13 @@ export const migrateToNamedExport = (projectFiles: Config) => {
           }
         }
       });
-      bar3.update(index);
+      bar4.update(index);
     });
-    bar3.stop();
+    bar4.stop();
 
     console.log('Handle jest.mock default');
-    const bar4 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    bar4.start(projectSourceFiles.length - 1, 0);
+    const bar5 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+    bar5.start(projectSourceFiles.length - 1, 0);
 
     projectSourceFiles.forEach((sourceFile, index) => {
       const currentFilePath = sourceFile.getFilePath();
@@ -292,9 +325,9 @@ export const migrateToNamedExport = (projectFiles: Config) => {
           }
         }
       });
-      bar4.update(index);
+      bar5.update(index);
     });
-    bar4.stop();
+    bar5.stop();
 
     return project.save();
   }
