@@ -9,7 +9,7 @@ npm i -g d2n
 ## CLI
 
 ```shell
-npx tsx src/index.ts --project-files='{src,test}/**/*.{tsx,ts,js}' --work-on='src/components/form/**/*.{tsx,ts,js}'
+d2n src/index.ts --project-files='{src,test}/**/*.{tsx,ts,js}' --work-on='src/components/form/**/*.{tsx,ts,js}'
 ```
 
 ## API
