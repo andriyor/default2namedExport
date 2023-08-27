@@ -5,6 +5,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "declaration": true,
     "skipDefaultLibCheck": true,
     "skipLibCheck": true,
     "outDir": "build"

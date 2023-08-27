@@ -1,6 +1,6 @@
 {
   "name": "d2n",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "",
   "main": "build/index.js",
   "bin": {
@@ -10,6 +10,10 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run"
   },
+  "files": [
+    "./build/index.d.ts",
+    "./build/index.js"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
