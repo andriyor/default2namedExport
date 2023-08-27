@@ -1,6 +1,6 @@
 {
   "name": "d2n",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
   "main": "build/index.js",
   "bin": {
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/cli-progress": "^3.11.0",
     "@types/node": "^18.15.11",
+    "@types/yargs-parser": "^21.0.0",
     "@typescript-eslint/eslint-plugin": "^5.58.0",
     "@typescript-eslint/parser": "^5.58.0",
     "eslint": "^8.47.0",

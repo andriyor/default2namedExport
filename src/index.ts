@@ -4,14 +4,19 @@ import path from 'path';
 
 import { CompilerOptions, Node, Project, SourceFile, SyntaxKind, ts } from 'ts-morph';
 import cliProgress from 'cli-progress';
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/no-var-requires,@typescript-eslint/no-unsafe-assignment
-const argv: Config = require("yargs-parser")(process.argv.slice(2));
+import parser from 'yargs-parser'
 
 type Config = {
   projectFiles: string;
   workOn?: string;
 };
+
+const argv = parser(process.argv.slice(2), {
+  configuration: {
+    'strip-dashed': true
+  },
+  string: ['projectFiles', 'workOn']
+}) as unknown as Config;
 
 export const trimQuotes = (str: string) => {
   return str.slice(1, -1);
@@ -356,8 +361,3 @@ if (argv.projectFiles) {
     workOn: argv?.workOn || ''
   });
 }
-
-// migrateToNamedExport({
-//   projectFiles: '{src,test}/**/*.{tsx,ts,js}',
-//   workOn: 'src/components/form/**/*.{tsx,ts,js}',
-// })
