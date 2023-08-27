@@ -15,12 +15,12 @@ d2n src/index.ts --project-files='{src,test}/**/*.{tsx,ts,js}' --work-on='src/co
 ## API
 
 ```ts
-import { migrateToNamedExport } from '../src';
+import { migrateToNamedExport } from 'd2n';
 
 migrateToNamedExport({
   projectFiles: '{src,test}/**/*.{tsx,ts,js}',
   workOn: 'src/components/form/**/*.{tsx,ts,js}',
-});
+})
 ```
 
 ## TODO
