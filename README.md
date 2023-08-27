@@ -13,9 +13,9 @@
 - [x] Handle lazy/dynamic import
 - [x] Ignore files which will be required
 - [x] Run as CLI
+- [x] Publish npm package
 - [ ] Run "Convert 'require' to 'import'"
 - [ ] Save previous imports with alias
-- [ ] Publish npm package
 
 ## CLI
 

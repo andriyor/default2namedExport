@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import path from 'path';
 
 import { CompilerOptions, Node, Project, SourceFile, SyntaxKind, ts } from 'ts-morph';
