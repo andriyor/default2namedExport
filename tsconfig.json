@@ -10,6 +10,4 @@
     "skipLibCheck": true,
     "outDir": "build"
   },
-  "include": ["src/**/*"],
-  "exclude": ["build/**/*"]
 }

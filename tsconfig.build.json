@@ -1,4 +1,5 @@
 {
   "extends": "./tsconfig",
-  "exclude": ["./test", "vite.config.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["./test", "vite.config.ts", "build/**/*"]
 }
