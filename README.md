@@ -1,5 +1,11 @@
 # default2namedExport
 
+## Install 
+
+```shell
+npm i -g d2n 
+```
+
 ## Supported
 
 - [x] Import from file with `export default` under different name
