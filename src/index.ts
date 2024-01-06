@@ -4,19 +4,23 @@ import path from 'path';
 
 import { CompilerOptions, Node, Project, SourceFile, SyntaxKind, ts } from 'ts-morph';
 import cliProgress from 'cli-progress';
-import parser from 'yargs-parser'
+import { typeFlag } from 'type-flag';
 
 type Config = {
   projectFiles: string;
   workOn?: string;
 };
 
-const argv = parser(process.argv.slice(2), {
-  configuration: {
-    'strip-dashed': true
+const parsed = typeFlag({
+  projectFiles: {
+    type: String,
+    alias: 'f',
   },
-  string: ['projectFiles', 'workOn']
-}) as unknown as Config;
+  workOn: {
+    type: String,
+    alias: 'w',
+  },
+});
 
 export const trimQuotes = (str: string) => {
   return str.slice(1, -1);
@@ -355,9 +359,11 @@ export const migrateToNamedExport = (projectFiles: Config) => {
   }
 };
 
-if (argv.projectFiles) {
-  migrateToNamedExport({
-    projectFiles: argv.projectFiles,
-    workOn: argv?.workOn || ''
+if (parsed.flags.projectFiles) {
+  void migrateToNamedExport({
+    projectFiles: parsed.flags.projectFiles,
+    workOn: parsed.flags.workOn || ''
   });
+} else {
+  console.log('provide --project-files option');
 }
