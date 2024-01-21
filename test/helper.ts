@@ -11,13 +11,13 @@ const getProjectFilesByPath = (projectPath: string) => {
     withFileTypes: true,
   })
     .filter((path) => !path.isDirectory())
-    .map((filePath) => path.relative(process.cwd(), filePath.fullpath()));
+    .map((filePath) => filePath.fullpath());
 };
 
 export const prepareTestCases = () => {
-  const testProjectFiles = getProjectFilesByPath(path.join(process.cwd(), 'test/test-project'));
-  const testProjectFilesExpected = getProjectFilesByPath(path.join(process.cwd(),
-    'test/test-project-expected'
+  const testProjectFiles = getProjectFilesByPath(path.join(__dirname, 'test-project'));
+  const testProjectFilesExpected = getProjectFilesByPath(path.join(__dirname,
+    'test-project-expected'
   ));
   return zip([testProjectFiles, testProjectFilesExpected]);
 };

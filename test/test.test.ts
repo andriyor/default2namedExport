@@ -6,12 +6,13 @@ import { beforeAll, describe, it, expect, afterAll } from 'vitest'
 
 import { migrateToNamedExport } from '../src';
 import { prepareTestCases } from './helper';
+import path from 'path';
 
 const exec = util.promisify(childProcess.exec);
 
 beforeAll(async () => {
   await migrateToNamedExport({
-    projectFiles: 'test/test-project/**/*.{tsx,ts}'
+    projectFiles: path.join(__dirname, 'test-project/**/*.{tsx,ts}')
   });
 });
 
