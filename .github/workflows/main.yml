@@ -17,6 +17,8 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
+      - name: node
+        run: node -v
       - name: Install modules
         run: pnpm install
       - name: Run tests
